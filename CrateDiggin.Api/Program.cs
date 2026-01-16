@@ -9,6 +9,7 @@ using Qdrant.Client; // Required for QdrantClient
 using Scalar.AspNetCore;
 using Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
+using CrateDiggin.Api.Plugins;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,6 +76,8 @@ builder.Services.AddSingleton<IVectorStoreRecordCollection<Guid, Album>>(sp =>
 
 builder.Services.AddTransient<SeedingService>();
 
+builder.Services.AddTransient<CrateDiggingPlugin>();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -137,6 +140,16 @@ app.MapPost("/fill-crates", async (CrateDiggin.Api.Services.SeedingService seede
 {
     var result = await seeder.SeedCratesAsync();
     return Results.Ok(result);
+});
+
+// The "Dig" Endpoint: Search for albums matching a vibe
+app.MapGet("/dig", async (
+    string query,
+    CrateDiggin.Api.Plugins.CrateDiggingPlugin diggingPlugin) =>
+{
+    // Usage: /dig?query=dark techno
+    var jsonResult = await diggingPlugin.SearchCratesAsync(query);
+    return Results.Content(jsonResult, "application/json");
 });
 
 app.Run();

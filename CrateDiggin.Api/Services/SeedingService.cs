@@ -1,6 +1,7 @@
 ﻿using CrateDiggin.Api.Models;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Embeddings;
+using System.Security.Cryptography;
 
 namespace CrateDiggin.Api.Services
 {
@@ -29,7 +30,7 @@ namespace CrateDiggin.Api.Services
             foreach (var album in starterPack)
             {
                 // Assign a new ID
-                album.Id = Guid.NewGuid();
+                album.Id = GenerateDeterministicGuid(album.Artist, album.Title);
 
                 // 3. Generate the "Vibe Vector" (The most important part!)
                 // We verify if the vector is empty before generating to save time/compute
@@ -45,6 +46,14 @@ namespace CrateDiggin.Api.Services
             }
 
             return $"Successfully seeded {count} albums into the crates!";
+        }
+
+        private static Guid GenerateDeterministicGuid(string artist, string title)
+        {
+            var key = $"{artist.ToLowerInvariant()}|{title.ToLowerInvariant()}";
+            var md5 = MD5.Create();
+            var hash = md5.ComputeHash(System.Text.Encoding.UTF8.GetBytes(key));
+            return new Guid(hash);
         }
     }
 }
