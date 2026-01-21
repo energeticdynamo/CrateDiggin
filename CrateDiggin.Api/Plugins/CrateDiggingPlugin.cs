@@ -1,49 +1,70 @@
 ﻿using System.ComponentModel;
+using System.Text;
 using System.Text.Json;
 using CrateDiggin.Api.Models;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Embeddings;
 
 namespace CrateDiggin.Api.Plugins
 {
     public class CrateDiggingPlugin(
     IVectorStoreRecordCollection<Guid, Album> collection,
-    ITextEmbeddingGenerationService embeddingService)
+    ITextEmbeddingGenerationService embeddingService,
+    IChatCompletionService chatService)
     {
-        [KernelFunction("search_crates")]
-        [Description("Searches for albums in the crate that match a specific vibe, genre, or description.")]
-        public async Task<string> SearchCratesAsync([Description("The description of the vibe, mood, or genre to search for")] string vibeQuery)
+        [KernelFunction("dig_crate")]
+        [Description("Searches for albums and organizes them into Vibe Bins.")]
+        public async Task<string> DigCrateAsync([Description("The user's vibe description")] string query)
         {
-            // 1. Convert the user's text query into a vector (Embedding)
-            // This effectively translates "sad music" into numbers like [0.1, -0.5, ...]
-            var queryVector = await embeddingService.GenerateEmbeddingAsync(vibeQuery);
+            // --- 1. The Retrieval (RAG) ---
+            // Convert query to vector and search Qdrant
+            var queryVector = await embeddingService.GenerateEmbeddingAsync(query);
+            var searchResults = await collection.VectorizedSearchAsync(queryVector, new VectorSearchOptions { Top = 6 });
 
-            // 2. Search Qdrant for the closest vectors
-            var searchResults = await collection.VectorizedSearchAsync(
-                queryVector,
-                new VectorSearchOptions { Top = 5}
-                );
-
-            //3. Build a list of simple objects
-            var matches = new List<object>();
-
-            await foreach (var record in searchResults.Results)
+            var foundAlbums = new List<Album>();
+            await foreach (var result in searchResults.Results)
             {
-                matches.Add(new
-                {
-                    title = record.Record.Title,
-                    artist = record.Record.Artist,
-                    description = record.Record.Description,
-                    match_score = Math.Round(record.Score ?? 0, 2)
-                });
+                foundAlbums.Add(result.Record);
             }
 
-            // 4. Return as JSON String
-            return JsonSerializer.Serialize(matches, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
+            if (foundAlbums.Count == 0)
+                return JsonSerializer.Serialize(new { message = "The crates are empty. Try adding more albums!" });
+
+            // --- 2. The Reasoning (The Clerk) ---
+            // We create a prompt that gives the LLM the data and tells it to be a Clerk
+            var chatHistory = new ChatHistory();
+
+            chatHistory.AddSystemMessage(
+            "You are 'Crate Digga', a knowledgeable, cool, and slightly opinionated record store clerk. " +
+            "You don't just give lists; you curate experiences. " +
+            "Analyze the albums provided and group them into 2 distinct 'Vibe Bins' (creative categories). " +
+            "Output the result as a clean JSON object.");
+
+            // Serialize the albums we found so the LLM can read them
+            var albumsJson = JsonSerializer.Serialize(foundAlbums.Select(a => new { a.Title, a.Artist, a.Description }));
+
+            chatHistory.AddUserMessage(
+            $"User is looking for: '{query}'.\n" +
+            $"I found these albums in the database: {albumsJson}.\n\n" +
+            "Please group these into 2 creative 'Vibe Bins'. Return ONLY JSON in this format:\n" +
+            "{\n" +
+            "  \"clerk_comment\": \"Your short, cool intro to the user.\",\n" +
+            "  \"bins\": [\n" +
+            "    { \"bin_name\": \"Creative Name 1\", \"description\": \"Why these go together\", \"albums\": [ \"Album Title\", ... ] },\n" +
+            "    { \"bin_name\": \"Creative Name 2\", \"description\": \"Why these go together\", \"albums\": [ \"Album Title\", ... ] }\n" +
+            "  ]\n" +
+            "}");
+
+            // --- 3. The Response ---
+            var response = await chatService.GetChatMessageContentAsync(chatHistory);
+
+            // Clean up the response (Mistral sometimes adds markdown '''json blocks)
+            var cleanJson = response.Content!.Replace("```json", "").Replace("```", "").Trim();
+
+            return cleanJson;
         }
+
     }
 }

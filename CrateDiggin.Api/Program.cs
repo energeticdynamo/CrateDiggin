@@ -148,8 +148,9 @@ app.MapGet("/dig", async (
     CrateDiggin.Api.Plugins.CrateDiggingPlugin diggingPlugin) =>
 {
     // Usage: /dig?query=dark techno
-    var jsonResult = await diggingPlugin.SearchCratesAsync(query);
-    return Results.Content(jsonResult, "application/json");
+    var result = await diggingPlugin.DigCrateAsync(query);
+
+    return Results.Content(result, "application/json");
 });
 
 app.Run();
