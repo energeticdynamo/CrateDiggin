@@ -2,4 +2,5 @@
   <Project Path="CrateDiggin.Api/CrateDiggin.Api.csproj" />
   <Project Path="CrateDiggin.AppHost/CrateDiggin.AppHost.csproj" />
   <Project Path="CrateDiggin.ServiceDefaults/CrateDiggin.ServiceDefaults.csproj" />
+  <Project Path="CrateDiggin.Worker/CrateDiggin.Worker.csproj" />
 </Solution>

@@ -18,4 +18,8 @@ builder.AddProject<Projects.CrateDiggin_Api>("api")
     .WithEnvironment("ConnectionStrings__Ollama", ollama.GetEndpoint("ollama-http"))
     .WithExternalHttpEndpoints();
 
+builder.AddProject<Projects.CrateDiggin_Worker>("cratediggin-worker")
+    .WithEnvironment("ConnectionStrings__Qdrant", qdrant.GetEndpoint("qdrant-grpc"))
+    .WithEnvironment("ConnectionStrings__Ollama", ollama.GetEndpoint("ollama-http"));
+
 builder.Build().Run();
