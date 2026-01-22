@@ -1,3 +1,5 @@
+using Google.Protobuf.WellKnownTypes;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 // 1. Setup Qdrant
@@ -12,14 +14,22 @@ var ollama = builder.AddContainer("ollama", "ollama/ollama", "latest")
     .WithBindMount("./ollama_data", "/root/.ollama");
 
 // 3. Setup the API Project
-builder.AddProject<Projects.CrateDiggin_Api>("api")
+var api = builder.AddProject<Projects.CrateDiggin_Api>("api")
     // Fix: Use the gRPC endpoint for QdrantClient
     .WithEnvironment("ConnectionStrings__Qdrant", qdrant.GetEndpoint("qdrant-grpc"))
     .WithEnvironment("ConnectionStrings__Ollama", ollama.GetEndpoint("ollama-http"))
     .WithExternalHttpEndpoints();
 
+// 4. Setup the Worker Project
 builder.AddProject<Projects.CrateDiggin_Worker>("cratediggin-worker")
     .WithEnvironment("ConnectionStrings__Qdrant", qdrant.GetEndpoint("qdrant-grpc"))
     .WithEnvironment("ConnectionStrings__Ollama", ollama.GetEndpoint("ollama-http"));
+
+builder.AddProject<Projects.CrateDiggin_Web>("cratediggin-web");
+
+// 5. Setup the Frontend (Blazor)
+builder.AddProject<Projects.CrateDiggin_Web>("web")
+    .WithReference(api) // Allow Web to talk to API
+    .WithExternalHttpEndpoints();
 
 builder.Build().Run();

@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CrateDiggin.Api\CrateDiggin.Api.csproj" />
+    <ProjectReference Include="..\CrateDiggin.Web\CrateDiggin.Web\CrateDiggin.Web.csproj" />
     <ProjectReference Include="..\CrateDiggin.Worker\CrateDiggin.Worker.csproj" />
   </ItemGroup>
 
