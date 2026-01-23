@@ -1,3 +1,4 @@
+using CrateDiggin.Web.Client.Clients;
 using CrateDiggin.Web.Client.Pages;
 using CrateDiggin.Web.Components;
 
@@ -9,7 +10,7 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 
-builder.Services.AddHttpClient<CrateDiggin.Web.Clients.DigginApiClient>(client =>
+builder.Services.AddHttpClient<DigginApiClient>(client =>
     client.BaseAddress = new("https+http://api"));
 
 var app = builder.Build();

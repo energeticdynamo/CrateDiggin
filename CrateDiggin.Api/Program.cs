@@ -17,9 +17,14 @@ builder.AddServiceDefaults();
 
 builder.Services.AddOpenApi();
 
-var qdrantEndpoint = builder.Configuration["ConnectionStrings:Qdrant"];
-var ollamaEndpoint = builder.Configuration["ConnectionStrings:Ollama"];
-var geminiApiKey = builder.Configuration["Gemini:ApiKey"];
+var qdrantEndpoint = builder.Configuration["ConnectionStrings:Qdrant"]
+    ?? throw new InvalidOperationException("ConnectionStrings:Qdrant is not configured.");
+
+var ollamaEndpoint = builder.Configuration["ConnectionStrings:Ollama"]
+    ?? throw new InvalidOperationException("ConnectionStrings:Ollama is not configured.");
+
+var geminiApiKey = builder.Configuration["Gemini:ApiKey"]
+    ?? throw new InvalidOperationException("ConnectionStrings: Gemini is not configured");
 
 // --- 1. Register Kernel & Capture Builder ---
 var kernelBuilder = builder.Services.AddKernel();
@@ -151,6 +156,28 @@ app.MapGet("/dig", async (
     var result = await diggingPlugin.DigCrateAsync(query);
 
     return Results.Content(result, "application/json");
+});
+
+// The Simple Vector Search Endpoint (For the UI Grid)
+app.MapGet("/api/search", async (
+    string query,
+    Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService embeddingService,
+    Microsoft.Extensions.VectorData.IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
+{
+    // 1. Generate Vector
+    var queryVector = await embeddingService.GenerateEmbeddingAsync(query);
+
+    // 2. Search DB
+    var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 6 });
+
+    // 3. Return full album objects (so UI gets CoverUrls)
+    var albums = new List<CrateDiggin.Api.Models.Album>();
+    await foreach (var record in searchResult.Results)
+    {
+        albums.Add(record.Record);
+    }
+
+    return Results.Ok(albums); 
 });
 
 app.Run();
