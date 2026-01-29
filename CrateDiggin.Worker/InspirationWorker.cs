@@ -1,9 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using CrateDiggin.Api.Models;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Embeddings;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace CrateDiggin.Worker;
 
@@ -61,8 +61,10 @@ public class InspirationWorker(
     private async Task FetchAndStoreAlbums(string tag, CancellationToken ct)
     {
         var client = httpClientFactory.CreateClient();
+
+        var randomPage = Random.Shared.Next(1, 20);
         // Fetch top 5 albums for this tag
-        var url = $"http://ws.audioscrobbler.com/2.0/?method=tag.gettopalbums&tag={tag}&api_key={_apiKey}&format=json&limit=5";
+        var url = $"http://ws.audioscrobbler.com/2.0/?method=tag.gettopalbums&tag={tag}&api_key={_apiKey}&format=json&limit=5&page={randomPage}";
 
         var response = await client.GetAsync(url, ct);
         if (!response.IsSuccessStatusCode) return;
@@ -79,14 +81,14 @@ public class InspirationWorker(
             var artist = albumData.GetProperty("artist").GetProperty("name").GetString();
             var title = albumData.GetProperty("name").GetString();
             var lastFmUrl = albumData.GetProperty("url").GetString();
-            
+
             if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(title)) continue;
 
             var details = await GetAlbumDetails(client, artist, title, ct);
 
-            var descripton = string.IsNullOrEmpty(details)
-                ? $"{tag} vibes. Album {title} by {artist}."
-                : details;
+            var description = string.IsNullOrEmpty(details)
+            ? $"{artist} - {title}. Music style and genre: {tag}. A {tag} album with {tag} vibes and influences."
+            : details;
 
             // Get the "Large" image (index 2 usually)
             var coverUrl = "";
@@ -95,21 +97,18 @@ public class InspirationWorker(
                 coverUrl = images[2].GetProperty("#text").GetString();
             }
 
-            if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(title)) continue;
-
             // Generate deterministic ID
             var id = GenerateDeterministicId($"{artist}-{title}");
-            var desc = $"{tag} vibes. Album {title} by {artist}.";
 
             // Vectorize!
-            var vector = await embeddingService.GenerateEmbeddingAsync(desc, cancellationToken: ct);
+            var vector = await embeddingService.GenerateEmbeddingAsync(description, cancellationToken: ct);
 
             var album = new Album
             {
                 Id = id,
                 Artist = artist,
                 Title = title,
-                Description = desc, // In a real app, we'd fetch the specific album info to get a better description
+                Description = description, // In a real app, we'd fetch the specific album info to get a better description
                 CoverUrl = coverUrl ?? "",
                 LastFmUrl = lastFmUrl ?? "",
                 Vector = vector
@@ -156,11 +155,29 @@ public class InspirationWorker(
                 }
             }
 
-            return $"Album {album} by {artist}. Genres: {string.Join(", ", tagsList.Take(5))}. {summary}";
+            // 3. Get release year if available
+            var year = "";
+            if (albumElement.TryGetProperty("wiki", out var wikiElement) &&
+                wikiElement.TryGetProperty("published", out var published))
+            {
+                var publishedStr = published.GetString();
+                if (!string.IsNullOrEmpty(publishedStr) && publishedStr.Length >= 4)
+                {
+                    // Extract year from date string
+                    var yearMatch = System.Text.RegularExpressions.Regex.Match(publishedStr, @"\b(19|20)\d{2}\b");
+                    if (yearMatch.Success) year = yearMatch.Value;
+                }
+            }
+
+            // Build rich description with era context
+            var genres = string.Join(", ", tagsList.Take(7));
+            var eraContext = !string.IsNullOrEmpty(year) ? $"Released in {year}. " : "";
+
+            return $"{artist} - {album}. {eraContext}Genres and styles: {genres}. {summary}".Trim();
         }
         catch
         {
-            return ""; // Fail gracefully
+            return "";
         }
     }
 

@@ -1,15 +1,12 @@
 using CrateDiggin.Api.Models;
+using CrateDiggin.Api.Plugins;
 using CrateDiggin.Api.Services;
-using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Embeddings;
-using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel.Connectors.Qdrant; // Required for AddQdrantVectorStore
-using Qdrant.Client; // Required for QdrantClient
+using Qdrant.Client;
 using Scalar.AspNetCore;
-using Grpc.Net.Client;
-using Microsoft.Extensions.DependencyInjection;
-using CrateDiggin.Api.Plugins;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -164,20 +161,76 @@ app.MapGet("/api/search", async (
     Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService embeddingService,
     Microsoft.Extensions.VectorData.IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
 {
-    // 1. Generate Vector
-    var queryVector = await embeddingService.GenerateEmbeddingAsync(query);
+    // 1. Enhance the query for better embedding results
+    var enhancedQuery = $"Music search: {query}. Looking for albums with this style, genre, and mood.";
 
-    // 2. Search DB
-    var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 6 });
+    // 2. Generate Vector
+    var queryVector = await embeddingService.GenerateEmbeddingAsync(enhancedQuery);
 
-    // 3. Return full album objects (so UI gets CoverUrls)
+    // 3. Search DB
+    var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 12 });
+
+    // 4. Return full album objects (so UI gets CoverUrls)
     var albums = new List<CrateDiggin.Api.Models.Album>();
     await foreach (var record in searchResult.Results)
     {
         albums.Add(record.Record);
+        if (albums.Count >= 6) break;
     }
 
-    return Results.Ok(albums); 
+    return Results.Ok(albums);
+});
+
+// Debug endpoint to see what's being matched and why
+app.MapGet("/api/search/debug", async (
+    string query,
+    Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService embeddingService,
+    Microsoft.Extensions.VectorData.IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
+{
+    // Use the SAME enhanced query as the main search endpoint
+    var enhancedQuery = $"Music search: {query}. Looking for albums with this style, genre, and mood.";
+
+    var queryVector = await embeddingService.GenerateEmbeddingAsync(enhancedQuery);
+    var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 10 });
+
+    var results = new List<object>();
+    await foreach (var record in searchResult.Results)
+    {
+        results.Add(new
+        {
+            record.Record.Artist,
+            record.Record.Title,
+            record.Record.Description,
+            Score = record.Score,
+            ScoreRating = record.Score switch
+            {
+                >= 0.80f => "Excellent",
+                >= 0.70f => "Good",
+                >= 0.60f => "Fair",
+                _ => "Poor"
+            }
+        });
+    }
+
+    // Calculate average score for quality assessment
+    var scores = results.Cast<dynamic>().Select(r => (float)r.Score).ToList();
+    var avgScore = scores.Count > 0 ? scores.Average() : 0;
+
+    return Results.Ok(new
+    {
+        OriginalQuery = query,
+        EnhancedQuery = enhancedQuery,
+        AverageScore = Math.Round(avgScore, 3),
+        OverallQuality = avgScore switch
+        {
+            >= 0.75f => "Great matches",
+            >= 0.65f => "Decent matches",
+            >= 0.55f => "Weak matches - consider adding more relevant tags",
+            _ => "Poor matches - genre likely missing from database"
+        },
+        ResultCount = results.Count,
+        Results = results
+    });
 });
 
 app.Run();

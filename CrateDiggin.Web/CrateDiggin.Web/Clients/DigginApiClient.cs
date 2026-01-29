@@ -1,5 +1,4 @@
 ﻿using CrateDiggin.Api.Models; // We'll need to copy the Album model here too, or reference API
-using System.Net.Http.Json;
 
 namespace CrateDiggin.Web.Clients
 {

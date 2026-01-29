@@ -1,8 +1,7 @@
-using CrateDiggin.Worker;
 using CrateDiggin.Api.Models;
-using Microsoft.SemanticKernel;
+using CrateDiggin.Worker;
 using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel.Connectors.Qdrant;
+using Microsoft.SemanticKernel;
 using Qdrant.Client;
 
 var builder = Host.CreateApplicationBuilder(args);

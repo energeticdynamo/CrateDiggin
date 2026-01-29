@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.VectorData;
-using Microsoft.SemanticKernel.Data;
-
-namespace CrateDiggin.Api.Models
+﻿namespace CrateDiggin.Api.Models
 {
     public class Album
     {

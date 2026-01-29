@@ -1,11 +1,10 @@
-﻿using System.ComponentModel;
-using System.Text;
-using System.Text.Json;
-using CrateDiggin.Api.Models;
+﻿using CrateDiggin.Api.Models;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Embeddings;
+using System.ComponentModel;
+using System.Text.Json;
 
 namespace CrateDiggin.Api.Plugins
 {
