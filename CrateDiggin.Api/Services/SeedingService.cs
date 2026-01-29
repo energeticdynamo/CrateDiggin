@@ -32,7 +32,7 @@ namespace CrateDiggin.Api.Services
                 // Assign a new ID
                 album.Id = GenerateDeterministicGuid(album.Artist, album.Title);
 
-                // 3. Generate the "Vibe Vector" (The most important part!)
+                // Generate the "Vibe Vector" (The most important part!)
                 // We verify if the vector is empty before generating to save time/compute
                 if (album.Vector.IsEmpty)
                 {

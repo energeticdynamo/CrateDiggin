@@ -1,0 +1,74 @@
+﻿@page "/"
+@using CrateDiggin.Web.Client.Clients
+@using CrateDiggin.Web.Client.Models
+@inject DigginApiClient ApiClient
+
+<PageTitle>Crate Diggin'</PageTitle>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="display-4">💽 Crate Diggin'</h1>
+            <p class="lead">Find your vibe.</p>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-md-8">
+            <div class="input-group input-group-lg">
+                <input type="text" class="form-control" placeholder="Describe the vibe (e.g., 'dark moody jazz')"
+                       @bind="searchQuery" @onkeyup="@(e => e.Key == "Enter" ? Search() : null)" />
+                <button class="btn btn-primary" @onclick="Search" disabled="@isSearching">
+                    @if (isSearching)
+                    {
+                        <span>Digging...</span>
+                    }
+                    else
+                    {
+
+                        <span>Dig</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+
+    @if (searchResults != null)
+    {
+        <div class="row">
+            @foreach (var album in searchResults)
+            {
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <img src="@album.CoverUrl" class="card-img-top" alt="@album.Title" style="height: 300px; object-fit: cover;">
+                        <div class="card-body">
+                            <h5 class="card-title">@album.Title</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">@album.Artist</h6>
+                            <p class="card-text small">@album.Description</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string searchQuery = "";
+    private bool isSearching = false;
+    private List<Album>? searchResults;
+
+    private async Task Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery)) return;
+
+        isSearching = true;
+        // Note: You'll need to update your DigginApiClient to return List<Album>
+        // For now, this connects the UI to the method
+        await InvokeAsync(StateHasChanged);
+
+        searchResults = await ApiClient.SearchAsync(searchQuery);
+
+        isSearching = false;
+    }
+}

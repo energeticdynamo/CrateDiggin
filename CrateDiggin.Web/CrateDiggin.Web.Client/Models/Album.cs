@@ -1,4 +1,4 @@
-﻿namespace CrateDiggin.Api.Models
+﻿namespace CrateDiggin.Web.Client.Models
 {
     public class Album
     {
