@@ -13,6 +13,11 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpClient<DigginApiClient>(client =>
     client.BaseAddress = new("https+http://api"));
 
+// Named HttpClient for proxying with service discovery
+builder.Services.AddHttpClient("ApiProxy", client =>
+    client.BaseAddress = new Uri("https+http://api"))
+    .AddServiceDiscovery();
+
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
@@ -30,9 +35,22 @@ else
 }
 
 app.UseHttpsRedirection();
-
-
 app.UseAntiforgery();
+
+// Simple proxy for /api/* requests
+app.Map("/api/{**path}", async (string? path, HttpContext context, IHttpClientFactory httpClientFactory) =>
+{
+    var client = httpClientFactory.CreateClient("ApiProxy");
+
+    var requestUri = $"/api/{path}{context.Request.QueryString}";
+
+    using var response = await client.GetAsync(requestUri);
+
+    context.Response.StatusCode = (int)response.StatusCode;
+    context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+
+    await response.Content.CopyToAsync(context.Response.Body);
+});
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

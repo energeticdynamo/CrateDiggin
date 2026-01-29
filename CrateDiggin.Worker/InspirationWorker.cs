@@ -22,14 +22,21 @@ public class InspirationWorker(
         logger.LogInformation("Worker starting... waiting 10s for Qdrant/Ollama.");
         await Task.Delay(10000, stoppingToken);
 
-        // 2. Define tags to "dig" for
-        var tags = new[] { "jazz", "electronic", "90s", "soul", "ambient", "hip hop" };
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await collection.CreateCollectionIfNotExistsAsync(stoppingToken);
+
+                var tags = config.GetSection("DiggingTags").Get<string[]>();
+
+                // Fallback if config is empty
+                if (tags == null || tags.Length == 0)
+                {
+                    logger.LogWarning("No tags found in appsettings.json! Using defaults.");
+                    tags = ["jazz", "electronic", "90s", "soul", "ambient", "hip hop", "rnb", "rock"];
+                }
 
                 foreach (var tag in tags)
                 {
@@ -72,6 +79,14 @@ public class InspirationWorker(
             var artist = albumData.GetProperty("artist").GetProperty("name").GetString();
             var title = albumData.GetProperty("name").GetString();
             var lastFmUrl = albumData.GetProperty("url").GetString();
+            
+            if (string.IsNullOrEmpty(artist) || string.IsNullOrEmpty(title)) continue;
+
+            var details = await GetAlbumDetails(client, artist, title, ct);
+
+            var descripton = string.IsNullOrEmpty(details)
+                ? $"{tag} vibes. Album {title} by {artist}."
+                : details;
 
             // Get the "Large" image (index 2 usually)
             var coverUrl = "";
@@ -101,7 +116,51 @@ public class InspirationWorker(
             };
 
             await collection.UpsertAsync(album, cancellationToken: ct);
-            logger.LogInformation("Stored: {Title}", title);
+            logger.LogInformation("Stored: {Title} (Rich Data)", title);
+        }
+    }
+
+    private async Task<string> GetAlbumDetails(HttpClient client, string artist, string album, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"http://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key={_apiKey}&artist={Uri.EscapeDataString(artist)}&album={Uri.EscapeDataString(album)}&format=json";
+            var response = await client.GetAsync(url, ct);
+            if (!response.IsSuccessStatusCode) return "";
+
+            using var doc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
+
+            if (!doc.RootElement.TryGetProperty("album", out var albumElement)) return "";
+
+            // 1. Get Wiki Summary
+            var summary = "";
+            if (albumElement.TryGetProperty("wiki", out var wiki) && wiki.TryGetProperty("summary", out var summaryProp))
+            {
+                summary = summaryProp.GetString();
+                // Strip HTML links from Last.fm summary
+                if (!string.IsNullOrEmpty(summary))
+                {
+                    var index = summary.IndexOf("<a href");
+                    if (index > 0) summary = summary.Substring(0, index);
+                }
+            }
+
+            // 2. Get Specific Tags (e.g., "alternative rock", "lo-fi", "r&b")
+            var tagsList = new List<string>();
+            if (albumElement.TryGetProperty("tags", out var tagsRoot) && tagsRoot.TryGetProperty("tag", out var tagsArray))
+            {
+                foreach (var t in tagsArray.EnumerateArray())
+                {
+                    if (t.TryGetProperty("name", out var tagName))
+                        tagsList.Add(tagName.GetString() ?? "");
+                }
+            }
+
+            return $"Album {album} by {artist}. Genres: {string.Join(", ", tagsList.Take(5))}. {summary}";
+        }
+        catch
+        {
+            return ""; // Fail gracefully
         }
     }
 
