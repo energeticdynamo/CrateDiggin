@@ -170,12 +170,14 @@ app.MapGet("/api/search", async (
     // 3. Search DB
     var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 12 });
 
+    int numOfAlbums = 5;
+
     // 4. Return full album objects (so UI gets CoverUrls)
     var albums = new List<CrateDiggin.Api.Models.Album>();
     await foreach (var record in searchResult.Results)
     {
         albums.Add(record.Record);
-        if (albums.Count >= 6) break;
+        if (albums.Count >= numOfAlbums) break;
     }
 
     return Results.Ok(albums);

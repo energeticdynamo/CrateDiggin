@@ -1,74 +1,127 @@
 ﻿@page "/"
+@using CrateDiggin.Web.Client.Component
 @using CrateDiggin.Web.Client.Clients
 @using CrateDiggin.Web.Client.Models
 @inject DigginApiClient ApiClient
 
-<PageTitle>Crate Diggin'</PageTitle>
+<div class="home-container">
+    <header class="hero">
+        <h1>🎵 Diggin in the Crates'</h1>
+        <p class="tagline">Discover music by vibe, not just genre</p>
+    </header>
 
-<div class="container mt-4">
-    <div class="row mb-4">
-        <div class="col">
-            <h1 class="display-4">💽 Crate Diggin'</h1>
-            <p class="lead">Find your vibe.</p>
+    <div class="search-section">
+        <div class="search-box">
+            <input type="text" 
+                   @bind="_query" 
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDown"
+                   placeholder="Describe your vibe... e.g., 'smooth jazz for a rainy evening'" 
+                   disabled="@_isSearching" />
+            <button @onclick="Search" disabled="@(_isSearching || string.IsNullOrWhiteSpace(_query))">
+                @if (_isSearching)
+                {
+                    <span>Digging...</span>
+                }
+                else
+                {
+                    <span>🔍 Dig</span>
+                }
+            </button>
         </div>
     </div>
 
-    <div class="row mb-5">
-        <div class="col-md-8">
-            <div class="input-group input-group-lg">
-                <input type="text" class="form-control" placeholder="Describe the vibe (e.g., 'dark moody jazz')"
-                       @bind="searchQuery" @onkeyup="@(e => e.Key == "Enter" ? Search() : null)" />
-                <button class="btn btn-primary" @onclick="Search" disabled="@isSearching">
-                    @if (isSearching)
-                    {
-                        <span>Digging...</span>
-                    }
-                    else
-                    {
-
-                        <span>Dig</span>
-                    }
-                </button>
-            </div>
-        </div>
-    </div>
-
-    @if (searchResults != null)
+    @if (_isSearching || _isRevealing)
     {
-        <div class="row">
-            @foreach (var album in searchResults)
-            {
-                <div class="col-md-4 mb-4">
-                    <div class="card h-100 shadow-sm">
-                        <img src="@album.CoverUrl" class="card-img-top" alt="@album.Title" style="height: 300px; object-fit: cover;">
-                        <div class="card-body">
-                            <h5 class="card-title">@album.Title</h5>
-                            <h6 class="card-subtitle mb-2 text-muted">@album.Artist</h6>
-                            <p class="card-text small">@album.Description</p>
+        <CrateAnimation IsSearching="@_isSearching" IsRevealing="@_isRevealing" />
+    }
+
+    @if (!_isSearching && !_isRevealing && _albums.Any())
+    {
+        <div class="results-section">
+            <h2>Found @_albums.Count gems 💎</h2>
+            <div class="album-grid">
+                @foreach (var album in _albums)
+                {
+                    <div class="album-card">
+                        <div class="album-cover">
+                            @if (!string.IsNullOrEmpty(album.CoverUrl))
+                            {
+                                <img src="@album.CoverUrl" alt="@album.Title" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="placeholder-cover">🎵</div>
+                            }
+                        </div>
+                        <div class="album-info">
+                            <h3>@album.Title</h3>
+                            <p>@album.Artist</p>
                         </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
+        </div>
+    }
+
+    @if (!_isSearching && !_albums.Any() && _hasSearched)
+    {
+        <div class="no-results">
+            <p>No albums found for that vibe. Try a different search!</p>
         </div>
     }
 </div>
 
 @code {
-    private string searchQuery = "";
-    private bool isSearching = false;
-    private List<Album>? searchResults;
+    private string _query = "";
+    private bool _isSearching = false;
+    private bool _isRevealing = false;
+    private bool _hasSearched = false;
+    private List<Album> _albums = new();
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_query))
+        {
+            await Search();
+        }
+    }
 
     private async Task Search()
     {
-        if (string.IsNullOrWhiteSpace(searchQuery)) return;
+        if (string.IsNullOrWhiteSpace(_query) || _isSearching) return;
 
-        isSearching = true;
-        // Note: You'll need to update your DigginApiClient to return List<Album>
-        // For now, this connects the UI to the method
-        await InvokeAsync(StateHasChanged);
+        _isSearching = true;
+        _isRevealing = false;
+        _albums.Clear();
+        _hasSearched = true;
+        StateHasChanged();
 
-        searchResults = await ApiClient.SearchAsync(searchQuery);
+        try
+        {
+            // Let the animation play for at least 2 seconds
+            var searchTask = ApiClient.SearchAsync(_query);
+            var delayTask = Task.Delay(2000);
 
-        isSearching = false;
+            await Task.WhenAll(searchTask, delayTask);
+            _albums = await searchTask;
+
+            // Show the "found" reveal animation
+            _isSearching = false;
+            _isRevealing = true;
+            StateHasChanged();
+
+            // After reveal animation, show results
+            await Task.Delay(1500);
+            _isRevealing = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Search error: {ex.Message}");
+            _isSearching = false;
+            _isRevealing = false;
+        }
+
+        StateHasChanged();
     }
 }
