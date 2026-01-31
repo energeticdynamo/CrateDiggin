@@ -161,7 +161,7 @@ app.MapGet("/api/search", async (
     // 3. Search DB
     var searchResult = await collection.VectorizedSearchAsync(queryVector, new() { Top = 12 });
 
-    int numOfAlbums = 5;
+    int numOfAlbums = 12;
 
     // 4. Return full album objects (so UI gets CoverUrls)
     var albums = new List<Album>();
