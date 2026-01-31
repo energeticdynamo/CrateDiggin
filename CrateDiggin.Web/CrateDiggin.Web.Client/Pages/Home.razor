@@ -4,70 +4,63 @@
 @using CrateDiggin.Web.Client.Models
 @inject DigginApiClient ApiClient
 
-<div class="home-container">
-    <header class="hero">
-        <h1>🎵 Diggin in the Crates'</h1>
-        <p class="tagline">Discover music by vibe, not just genre</p>
-    </header>
+<PageTitle>Crate Diggin'</PageTitle>
 
-    <div class="search-section">
-        <div class="search-box">
-            <input type="text" 
-                   @bind="_query" 
-                   @bind:event="oninput"
-                   @onkeydown="HandleKeyDown"
-                   placeholder="Describe your vibe... e.g., 'smooth jazz for a rainy evening'" 
-                   disabled="@_isSearching" />
-            <button @onclick="Search" disabled="@(_isSearching || string.IsNullOrWhiteSpace(_query))">
-                @if (_isSearching)
-                {
-                    <span>Digging...</span>
-                }
-                else
-                {
-                    <span>🔍 Dig</span>
-                }
-            </button>
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-3 fw-bold">🎵 Crate Diggin'</h1>
+        <p class="lead text-muted">Discover music by vibe, not just genre.</p>
+    </div>
+
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-8">
+            <div class="input-group input-group-lg shadow-sm">
+                <input type="text"
+                       class="form-control"
+                       placeholder="Describe your vibe... (e.g., 'smooth jazz for a rainy day')"
+                       @bind="_query"
+                       @bind:event="oninput"
+                       @onkeyup="HandleKeyUp"
+                       disabled="@_isSearching" />
+                <button class="btn btn-primary px-4" @onclick="Search" disabled="@(_isSearching || string.IsNullOrWhiteSpace(_query))">
+                    @if (_isSearching)
+                    {
+                        <span>Digging...</span>
+                    }
+                    else
+                    {
+                        <span>🔍 Dig</span>
+                    }
+                </button>
+            </div>
         </div>
     </div>
 
     @if (_isSearching || _isRevealing)
     {
-        <CrateAnimation IsSearching="@_isSearching" IsRevealing="@_isRevealing" />
-    }
-
-    @if (!_isSearching && !_isRevealing && _albums.Any())
-    {
-        <div class="results-section">
-            <h2>Found @_albums.Count gems 💎</h2>
-            <div class="album-grid">
-                @foreach (var album in _albums)
-                {
-                    <div class="album-card">
-                        <div class="album-cover">
-                            @if (!string.IsNullOrEmpty(album.CoverUrl))
-                            {
-                                <img src="@album.CoverUrl" alt="@album.Title" loading="lazy" />
-                            }
-                            else
-                            {
-                                <div class="placeholder-cover">🎵</div>
-                            }
-                        </div>
-                        <div class="album-info">
-                            <h3>@album.Title</h3>
-                            <p>@album.Artist</p>
-                        </div>
-                    </div>
-                }
+        <div class="row justify-content-center my-5">
+            <div class="col-auto">
+                <CrateAnimation IsSearching="@_isSearching" IsRevealing="@_isRevealing" />
             </div>
         </div>
     }
 
-    @if (!_isSearching && !_albums.Any() && _hasSearched)
+    @if (_albums != null && _albums.Any() && !_isSearching && !_isRevealing)
     {
-        <div class="no-results">
-            <p>No albums found for that vibe. Try a different search!</p>
+        <div class="row">
+            @foreach (var album in _albums)
+            {
+                <div class="col-sm-6 col-md-4 col-lg-3 mb-5">
+                    <AlbumCard Album="album" />
+                </div>
+            }
+        </div>
+    }
+    else if (_hasSearched && !_isSearching && !_isRevealing && (_albums == null || !_albums.Any()))
+    {
+        <div class="text-center mt-5 text-muted">
+            <h3>🚫 No gems found.</h3>
+            <p>Try a different description!</p>
         </div>
     }
 </div>
@@ -79,7 +72,7 @@
     private bool _hasSearched = false;
     private List<Album> _albums = new();
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    private async Task HandleKeyUp(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_query))
         {
@@ -95,24 +88,30 @@
         _isRevealing = false;
         _albums.Clear();
         _hasSearched = true;
+
+        // Trigger UI to show "Digging..."
         StateHasChanged();
 
         try
         {
-            // Let the animation play for at least 2 seconds
+            // 1. Start the API Search
             var searchTask = ApiClient.SearchAsync(_query);
-            var delayTask = Task.Delay(2000);
 
-            await Task.WhenAll(searchTask, delayTask);
+            // 2. Play animation for at least 2 seconds (so it feels like digging)
+            var animationTask = Task.Delay(2000);
+
+            // 3. Wait for both to finish
+            await Task.WhenAll(searchTask, animationTask);
+
             _albums = await searchTask;
 
-            // Show the "found" reveal animation
+            // 4. Reveal Phase (Optional: if CrateAnimation has a reveal state)
             _isSearching = false;
             _isRevealing = true;
             StateHasChanged();
 
-            // After reveal animation, show results
-            await Task.Delay(1500);
+            // 5. Short pause to let the "Reveal" animation play before showing the grid
+            await Task.Delay(1000);
             _isRevealing = false;
         }
         catch (Exception ex)

@@ -1,0 +1,39 @@
+﻿@using CrateDiggin.Web.Client.Models
+
+<div class="album-wrapper">
+    <div class="vinyl-container">
+        <div class="vinyl-record">
+            <div class="vinyl-label" style="background-image: url('@Album.CoverUrl')"></div>
+        </div>
+
+        <div class="album-sleeve">
+            <img src="@Album.CoverUrl" alt="@Album.Title" />
+
+            @if (Album.Score.HasValue)
+            {
+                <div class="vibe-badge @GetScoreClass()">
+                    @(Math.Round(Album.Score.Value * 100))% Match
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="album-info mt-3">
+        <h5 class="text-truncate">@Album.Title</h5>
+        <p class="text-muted small">@Album.Artist</p>
+        <a href="@Album.LastFmUrl" target="_blank" class="btn btn-outline-dark btn-sm w-100">
+            View on Last.fm
+        </a>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Album Album { get; set; } = default!;
+
+    private string GetScoreClass() => Album.Score switch
+    {
+        >= 0.90 => "score-perfect",
+        >= 0.80 => "score-good",
+        _ => "score-wildcard"
+    };
+}

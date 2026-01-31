@@ -15,5 +15,7 @@
         public string Description { get; set; } = string.Empty;
 
         public ReadOnlyMemory<float> Vector { get; set; }
+
+        public double? Score { get; set; }
     }
 }

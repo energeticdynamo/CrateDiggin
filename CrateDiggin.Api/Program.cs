@@ -1,6 +1,5 @@
 using CrateDiggin.Api.Models;
 using CrateDiggin.Api.Plugins;
-using CrateDiggin.Api.Services;
 using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.Embeddings;
@@ -76,8 +75,6 @@ builder.Services.AddSingleton<IVectorStoreRecordCollection<Guid, Album>>(sp =>
     return vectorStore.GetCollection<Guid, Album>("albums", recordDefinition);
 });
 
-builder.Services.AddTransient<SeedingService>();
-
 builder.Services.AddTransient<CrateDiggingPlugin>();
 
 var app = builder.Build();
@@ -138,12 +135,6 @@ app.MapPost("/seed-album", async (
     return Results.Ok($"Saved '{album.Title}' with vector size {album.Vector.Length} to Qdrant!");
 });
 
-app.MapPost("/fill-crates", async (CrateDiggin.Api.Services.SeedingService seeder) =>
-{
-    var result = await seeder.SeedCratesAsync();
-    return Results.Ok(result);
-});
-
 // The "Dig" Endpoint: Search for albums matching a vibe
 app.MapGet("/dig", async (
     string query,
@@ -173,10 +164,12 @@ app.MapGet("/api/search", async (
     int numOfAlbums = 5;
 
     // 4. Return full album objects (so UI gets CoverUrls)
-    var albums = new List<CrateDiggin.Api.Models.Album>();
+    var albums = new List<Album>();
     await foreach (var record in searchResult.Results)
     {
-        albums.Add(record.Record);
+        var album = record.Record;
+        album.Score = record.Score;
+        albums.Add(album);
         if (albums.Count >= numOfAlbums) break;
     }
 

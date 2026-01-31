@@ -14,6 +14,9 @@
 
         public string Description { get; set; } = string.Empty;
 
+        public double? Score { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore]
         public ReadOnlyMemory<float> Vector { get; set; }
     }
 }
