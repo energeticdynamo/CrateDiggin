@@ -138,7 +138,7 @@ app.MapPost("/seed-album", async (
 // The "Dig" Endpoint: Search for albums matching a vibe
 app.MapGet("/dig", async (
     string query,
-    CrateDiggin.Api.Plugins.CrateDiggingPlugin diggingPlugin) =>
+    CrateDiggingPlugin diggingPlugin) =>
 {
     // Usage: /dig?query=dark techno
     var result = await diggingPlugin.DigCrateAsync(query);
@@ -149,8 +149,8 @@ app.MapGet("/dig", async (
 // The Simple Vector Search Endpoint (For the UI Grid)
 app.MapGet("/api/search", async (
     string query,
-    Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService embeddingService,
-    Microsoft.Extensions.VectorData.IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
+    ITextEmbeddingGenerationService embeddingService,
+    IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
 {
     // 1. Enhance the query for better embedding results
     var enhancedQuery = $"Music search: {query}. Looking for albums with this style, genre, and mood.";
@@ -179,8 +179,8 @@ app.MapGet("/api/search", async (
 // Debug endpoint to see what's being matched and why
 app.MapGet("/api/search/debug", async (
     string query,
-    Microsoft.SemanticKernel.Embeddings.ITextEmbeddingGenerationService embeddingService,
-    Microsoft.Extensions.VectorData.IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
+    ITextEmbeddingGenerationService embeddingService,
+    IVectorStoreRecordCollection<Guid, CrateDiggin.Api.Models.Album> collection) =>
 {
     // Use the SAME enhanced query as the main search endpoint
     var enhancedQuery = $"Music search: {query}. Looking for albums with this style, genre, and mood.";
