@@ -1,5 +1,4 @@
 using CrateDiggin.Web.Client.Clients;
-using CrateDiggin.Web.Client.Pages;
 using CrateDiggin.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
