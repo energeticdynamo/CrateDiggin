@@ -5,4 +5,5 @@
   <Project Path="CrateDiggin.Web/CrateDiggin.Web.Client/CrateDiggin.Web.Client.csproj" />
   <Project Path="CrateDiggin.Web/CrateDiggin.Web/CrateDiggin.Web.csproj" />
   <Project Path="CrateDiggin.Worker/CrateDiggin.Worker.csproj" />
+  <Project Path="UnitTest/UnitTest.csproj" Id="d0ed8e6f-a6bb-43d8-8059-b09f75c6a5e7" />
 </Solution>
